@@ -1,0 +1,143 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Qibla Finder</title>
+    <link rel="manifest" href="manifest.json">
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            text-align: center;
+            padding: 2em;
+            background-color: #f2f2f2;
+            color: #333;
+        }
+        h1 {
+            font-size: 2.5em;
+            margin-bottom: 0.5em;
+        }
+        input, select, button {
+            font-size: 1.5em;
+            padding: 0.5em;
+            margin: 0.5em;
+            width: 90%;
+            max-width: 400px;
+        }
+        #result {
+            margin-top: 2em;
+            font-size: 1.5em;
+            color: #2c3e50;
+        }
+    </style>
+</head>
+<body>
+    <h1>🕌 Qibla Finder</h1>
+    <p>Select Input Type:</p>
+    <select id="inputType" onchange="updateInputType()">
+        <option value="decimal">Decimal Degrees</option>
+        <option value="dms">Degrees, Minutes, Seconds</option>
+        <option value="gps">Use GPS</option>
+    </select>
+
+    <div id="inputFields"></div>
+
+    <button onclick="calculateQibla()">Find Qibla</button>
+
+    <div id="result"></div>
+
+    <script>
+        function updateInputType() {
+            const inputType = document.getElementById('inputType').value;
+            const container = document.getElementById('inputFields');
+            container.innerHTML = '';
+            if (inputType === 'decimal') {
+                container.innerHTML = `
+                    <input id="lat" type="number" step="any" placeholder="Latitude (e.g., 25.2048)">
+                    <input id="lon" type="number" step="any" placeholder="Longitude (e.g., 55.2708)">
+                `;
+            } else if (inputType === 'dms') {
+                container.innerHTML = `
+                    <input id="latDeg" type="number" placeholder="Latitude Degrees">
+                    <input id="latMin" type="number" placeholder="Latitude Minutes">
+                    <input id="latSec" type="number" placeholder="Latitude Seconds">
+                    <input id="latDir" type="text" placeholder="N or S">
+
+                    <input id="lonDeg" type="number" placeholder="Longitude Degrees">
+                    <input id="lonMin" type="number" placeholder="Longitude Minutes">
+                    <input id="lonSec" type="number" placeholder="Longitude Seconds">
+                    <input id="lonDir" type="text" placeholder="E or W">
+                `;
+            }
+        }
+
+        function dmsToDecimal(deg, min, sec, dir) {
+            let decimal = parseFloat(deg) + parseFloat(min)/60 + parseFloat(sec)/3600;
+            if (dir === 'S' || dir === 'W') decimal *= -1;
+            return decimal;
+        }
+
+        function calculateQibla() {
+            const type = document.getElementById('inputType').value;
+
+            let lat, lon;
+            if (type === 'decimal') {
+                lat = parseFloat(document.getElementById('lat').value);
+                lon = parseFloat(document.getElementById('lon').value);
+                showQibla(lat, lon);
+            } else if (type === 'dms') {
+                lat = dmsToDecimal(
+                    document.getElementById('latDeg').value,
+                    document.getElementById('latMin').value,
+                    document.getElementById('latSec').value,
+                    document.getElementById('latDir').value.toUpperCase()
+                );
+                lon = dmsToDecimal(
+                    document.getElementById('lonDeg').value,
+                    document.getElementById('lonMin').value,
+                    document.getElementById('lonSec').value,
+                    document.getElementById('lonDir').value.toUpperCase()
+                );
+                showQibla(lat, lon);
+            } else if (type === 'gps') {
+                if (navigator.geolocation) {
+                    navigator.geolocation.getCurrentPosition(function(position) {
+                        lat = position.coords.latitude;
+                        lon = position.coords.longitude;
+                        showQibla(lat, lon);
+                    }, function(error) {
+                        document.getElementById('result').innerText = 'Unable to access GPS location.';
+                    });
+                } else {
+                    document.getElementById('result').innerText = 'Geolocation is not supported by your browser.';
+                }
+            }
+        }
+
+        function showQibla(lat, lon) {
+            const kaabaLat = 21.4225;
+            const kaabaLon = 39.8262;
+            const phiK = kaabaLat * Math.PI / 180;
+            const lambdaK = kaabaLon * Math.PI / 180;
+            const phi = lat * Math.PI / 180;
+            const lambda = lon * Math.PI / 180;
+            const qibla =
+                Math.atan2(
+                    Math.sin(lambdaK - lambda),
+                    Math.cos(phi) * Math.tan(phiK) - Math.sin(phi) * Math.cos(lambdaK - lambda)
+                ) * 180 / Math.PI;
+
+            const direction = (qibla + 360) % 360;
+
+            // Sunrise/Sunset calculation
+            const times = new Date().toLocaleString('en-US', { timeZone: 'UTC' });
+            const resultText = `📍 Latitude: ${lat.toFixed(4)}, Longitude: ${lon.toFixed(4)}
+🧭 Qibla Direction: ${direction.toFixed(2)}° from True North`;
+            document.getElementById('result').innerText = resultText;
+        }
+
+        window.onload = updateInputType;
+    </script>
+</body>
+</html>
